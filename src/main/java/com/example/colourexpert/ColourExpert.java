@@ -9,13 +9,11 @@
 package com.example.colourexpert;
 
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.scene.Group;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.Control;
-import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.layout.*;
+import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.RadialGradient;
@@ -27,6 +25,7 @@ import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Random;
 
 public class ColourExpert extends Application {
@@ -35,28 +34,20 @@ public class ColourExpert extends Application {
     private Scene start;
     private Scene about;
     private Scene main;
-    private Scene chooseRound;
     private Group root1 = new Group();
     private Group root2 = new Group();
     private Group root3 = new Group();
-    private Group root4 = new Group();
 
-    private int rounds = 0;
     private int playerScore = 0;
-    private int bestScore;
-
-    private boolean playerStartedGame = false;
-    private boolean gameOver = false;
+    private int difficulty = 200;
+    private ArrayList<String> colorsList = new ArrayList<>();
+    private int index = 0;
 
     public int canvasWidth = 500;
     public int canvasHeight = 500;
 
     @Override
     public void start(Stage stage) throws IOException {
-//        Scene scene = new Scene(root1, 320, 240);
-//        stage.setTitle("Hello!");
-//        stage.setScene(scene);
-//        stage.show();
 
         window = stage;
         stage.setResizable(false); // User cannot resize the window
@@ -66,114 +57,164 @@ public class ColourExpert extends Application {
         start = createStart(); // Creates the "start" scene
         about = createAbout(); // Creates the "about" scene
         main = createMain(); // Creates the main scene
-        chooseRound = createChooseRound();
+//        chooseRound = createChooseRound();
 
-        CircleBox c = new CircleBox();
+        //Gradient Background
         start.setFill(new RadialGradient(
                 0, 0, 0, 0, 1, true,   //sizing
                 CycleMethod.NO_CYCLE,                       //cycling
-                new Stop(0, c.getRandomColor(0,256)),    //colors (in hexadecimal)
-                new Stop(1, c.getRandomColor(0,256)))
+                new Stop(0, getRandomColor(0,256)),    //colors (in hexadecimal)
+                new Stop(1, getRandomColor(0,256)))
         );
 
-        stage.setScene(chooseRound); // The first scene to show when the program runs
+        stage.setScene(start); // The first scene to show when the program runs
         stage.show();
     }
 
-    private Scene createChooseRound() {
-        Button btn1 = new Button("5 rounds");
-        Button btn2 = new Button("10 rounds");
-        Button btn3 = new Button("20 rounds");
-        Shape Circle = new Circle(6);
-        btn1.setShape(Circle);
-        btn2.setShape(Circle);
-        btn3.setShape(Circle);
-        btn1.setPrefSize(100,50);
-        btn2.setPrefSize(100,50);
-        btn3.setPrefSize(100,50);
-        setLayout(btn1, 200, 150);
-        setLayout(btn2, 200, 200);
-        setLayout(btn3, 200, 250);
-
-        btn1.setOnAction(e -> {
-            setUpGame(5);
-            System.out.println(rounds);
-            switchScenes(main);
-        });
-
-        root4.getChildren().addAll(btn1, btn2, btn3);
-        chooseRound = new Scene(root4, canvasWidth, canvasHeight);
-        chooseRound.setFill(Color.BLACK);
-        return chooseRound;
-    }
-
     private Scene createMain() {
-        Button btn1 = new Button("LEFT");
-        Button btn2 = new Button("RIGHT");
-        setLayout(btn1, 100, 350);
-        setLayout(btn2, 350, 350);
-
-        newComparison(200);
-
-//        int i = 0;
-//        while (playerStartedGame) {
-//            newComparison(200);
-//            System.out.println(rounds);
-//        }
-
-        root1.getChildren().addAll(btn1, btn2);
         main = new Scene(root1, canvasWidth, canvasHeight);
-        main.setFill(Color.BLACK);
+
+        // Add the colors for the player to guess into an ArrayList
+        colorsList.add("Red");
+        colorsList.add("Green");
+        colorsList.add("Blue");
+
+        // Menu Bar + Listeners
+        MenuBar menuBar = new MenuBar();
+        VBox vbox = new VBox(menuBar);
+        vbox.setPrefWidth(canvasWidth);
+
+        Menu menu1 = new Menu("File");
+        Menu menu2 = new Menu("Edit");
+        Menu menu3 = new Menu("Help");
+
+        MenuItem quitItem = new MenuItem("Quit");
+        MenuItem increaseDifficultyItem = new MenuItem("Increase difficulty");
+        MenuItem decreaseDifficultyItem = new MenuItem("Decrease difficulty");
+        MenuItem aboutItem = new MenuItem("About");
+
+        menuBar.getMenus().add(menu1);
+            menu1.getItems().add(quitItem);
+                quitItem.setOnAction(e -> {
+                    storePlayerScore(playerScore); // Stores the player's highest score before exiting
+                    Platform.exit(); // Exits the application
+                });
+        menuBar.getMenus().add(menu2);
+            menu2.getItems().add(increaseDifficultyItem);
+                increaseDifficultyItem.setOnAction(e -> { // Decreases the difference in colors (more difficult)
+                    updateDifficulty(1);
+                });
+            menu2.getItems().add(decreaseDifficultyItem);
+                decreaseDifficultyItem.setOnAction(e -> { // Increases the difference in colors (less difficult)
+                    updateDifficulty(0);
+                });
+        menuBar.getMenus().add(menu3);
+            menu3.getItems().add(aboutItem);
+                aboutItem.setOnAction(e -> {
+                    switchScenes(about); // Goes back to "about" scene
+                });
+
+        // Setting up the label + buttons for the GUI
+        setRandomIndex(); // Initializes the index with a random number from within the color list
+        Label lbl1 = new Label("Which has more " + colorsList.get(index) + "?");
+        lbl1.setFont(Font.font(20));
+        lbl1.setTextFill(Color.WHITE);
+        setLayout(lbl1, 150, 140);
+        Button leftBtn = new Button("LEFT");
+        Button rightBtn = new Button("RIGHT");
+        setLayout(leftBtn, 100, 350);
+        setLayout(rightBtn, 350, 350);
+        newComparison(difficulty, index);
+
+        // Event-handling for left button
+        leftBtn.setOnAction(e -> Platform.runLater(() -> { // Multi-threading
+            setRandomIndex();
+            lbl1.setText("Which has more " + colorsList.get(index) + "?");
+            newComparison(difficulty, index);
+            System.out.println(difficulty);
+        }));
+
+        // Event-handling for right button
+        rightBtn.setOnAction(e -> Platform.runLater(() -> {  // Multi-threading
+            setRandomIndex();
+            lbl1.setText("Which has more " + colorsList.get(index) + "?");
+            newComparison(difficulty, index);
+            System.out.println(difficulty);
+        }));
+
+        main.setFill(Color.BLACK); // Sets background to black
+        root1.getChildren().addAll(leftBtn, rightBtn, lbl1, vbox);
         return main;
     }
 
-    public void setUpGame(int num) {
-        playerStartedGame = true;
-        rounds = num;
+    // Function to set variable 'index' based on the ArrayList<Integer> colorList
+    private void setRandomIndex() {
+        index = (int)(Math.random() * colorsList.size());
     }
 
-    public void increment(int i) {
-        i++;
+    // Increases or decreases the "difficulty" variable
+    public void updateDifficulty(int i) {
+        int increment = 40;
+        if (i == 0) {
+            if (difficulty + increment >= 255)
+                difficulty = 255;
+            else
+                difficulty += increment;
+        } else if (i == 1) {
+            if (difficulty - increment <= 0)
+                difficulty = 5;
+            else
+                difficulty -= increment;
+        }
     }
 
+    // Efficiently sets the x-y layout of certain nodes
     public void setLayout(Control obj, int x, int y) {
         obj.setLayoutX(x);
         obj.setLayoutY(y);
     }
 
-    // Creates two new game boxes
-    public void newComparison(int difference) {
+    // Creates two new color boxes
+    public void newComparison(int difference, int color) {
         int higherRange = getHigherRange(difference);
-        CircleBox c = new CircleBox();
-        c.createCircleBox(root1, 100, 200, getLowerRange(difference, higherRange), higherRange);
+        CircleBox c = new CircleBox(root1, 100, 200, getLowerRange(difference, higherRange), higherRange, color);
         System.out.println(c.getColorCounter());
-        c.createCircleBox(root1, 350, 200, getLowerRange(difference, higherRange), higherRange);
-        System.out.println(c.getColorCounter());
+        CircleBox c2 = new CircleBox(root1, 350, 200, getLowerRange(difference, higherRange), higherRange, color);
+        System.out.println(c2.getColorCounter());
     }
 
+    // Obtains the "higher range" of the difference in value between the box colors
     public int getHigherRange(int difference) {
         Random rand = new Random();
-        int num = rand.nextInt(256);
+        int num = rand.nextInt(255);
         if (num <= difference) {
             while (num <= difference) {
                 num++;
             }
             System.out.println(num);
             return num;
-        } else if (num > difference) {
-            System.out.println(num);
-            return num;
-        } else {
-            return 256;
+        }
+        else {
+            return 255;
         }
     }
 
+    // Obtains the "lower range" of the difference in value between the box colors
     public int getLowerRange(int difference, int higherRange) {
-        int num = higherRange - difference;
-        return num;
+        return higherRange - difference;
     }
 
-    private Scene createStart() throws FileNotFoundException {
+    // Randomly chooses a color for each RGB value
+    public Color getRandomColor(int lowerRange, int higherRange) {
+        Random rand = new Random();
+        int r = lowerRange + rand.nextInt(higherRange-lowerRange);
+        int g = lowerRange + rand.nextInt(higherRange-lowerRange);
+        int b = lowerRange + rand.nextInt(higherRange-lowerRange);
+        return Color.rgb(r,g,b,1);
+    }
+
+    // Forms the 'start' scene
+    private Scene createStart() {
 
         // Labels
         Label lbl1 = new Label("Color Expert");
@@ -197,6 +238,7 @@ public class ColourExpert extends Application {
         return start;
     }
 
+    // Forms the 'about' scene
     private Scene createAbout() {
 
         // Labels
@@ -210,7 +252,6 @@ public class ColourExpert extends Application {
                 "- Lock in your answer with the corresponding button\n" +
                 "at the bottom of the screen.\n" +
                 "- Got it correct? You earn a point!\n" +
-                "- The game ends once you have finished all the rounds.\n\n" +
                 "                            Ready? Hit the button below!");
 
         lbl1.setFont(Font.font(30));
